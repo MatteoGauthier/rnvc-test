@@ -57,6 +57,7 @@ export default function CameraScreen(): React.ReactElement {
     ScreenOrientation.Orientation.PORTRAIT_UP
   )
   const [error, setError] = useState<string | null>(null)
+  const [cameraKey, setCameraKey] = useState(0)
 
   const navigation = useNavigation()
   const isFocused = navigation.isFocused()
@@ -71,6 +72,27 @@ export default function CameraScreen(): React.ReactElement {
 
   // Configure camera format for Full HD (1920x1080) at 30fps
   const format = useCameraFormat(device, [{ videoResolution: { width: 1920, height: 1080 } }, { fps: 30 }])
+
+  // Define format configurations for different modes
+  const verticalFormat = useCameraFormat(device, [{ videoResolution: { width: 1080, height: 1920 } }, { fps: 30 }])
+  const horizontalFormat = useCameraFormat(device, [{ videoResolution: { width: 1920, height: 1080 } }, { fps: 30 }])
+  const squareFormat = useCameraFormat(device, [{ videoResolution: { width: 1080, height: 1080 } }, { fps: 30 }])
+  
+  // Get the proper format based on selected mode
+  const videoFormat = useMemo(() => {
+    if (!device) return format;
+    
+    switch (selectedMode) {
+      case "vertical":
+        return verticalFormat || format;
+      case "horizontal":
+        return horizontalFormat || format;
+      case "square":
+        return squareFormat || format;
+      default:
+        return format;
+    }
+  }, [device, selectedMode, format, verticalFormat, horizontalFormat, squareFormat]);
 
   // Check if orientation is landscape
   const isLandscape = useMemo(() => {
@@ -121,10 +143,11 @@ export default function CameraScreen(): React.ReactElement {
           }
         }
       } else {
-        // Square: use height as the constraint
+        // Square: use the smaller dimension as constraint to maintain perfect square
+        const size = Math.min(screenWidth, screenHeight)
         return {
-          width: screenHeight,
-          height: screenHeight,
+          width: size,
+          height: size,
         }
       }
     } else {
@@ -142,10 +165,11 @@ export default function CameraScreen(): React.ReactElement {
           height: screenWidth * modeConfig.portraitRatio,
         }
       } else {
-        // Square: use width as the constraint
+        // Square: use the smaller dimension as constraint to maintain perfect square
+        const size = Math.min(screenWidth, screenHeight)
         return {
-          width: screenWidth,
-          height: screenWidth,
+          width: size,
+          height: size,
         }
       }
     }
@@ -178,10 +202,11 @@ export default function CameraScreen(): React.ReactElement {
           console.log("Orientation changed:", orientationInfo.orientation)
           setDeviceOrientation(orientationInfo.orientation)
 
-          // Force re-render of camera
-          if (camera.current) {
-            camera.current.forceUpdate?.()
-          }
+          // Wait for dimensions to update after orientation change
+          setTimeout(() => {
+            // Force camera remount by updating key
+            setCameraKey(prev => prev + 1)
+          }, 100) // Small delay to ensure dimensions are updated
         })
 
         // Get current orientation
@@ -241,13 +266,32 @@ export default function CameraScreen(): React.ReactElement {
 
     setIsRecording(true)
     try {
+      // Get the format text based on selected mode
+      const formatText = selectedMode === "vertical" ? "9:16 vertical" : 
+                         selectedMode === "horizontal" ? "16:9 horizontal" : 
+                         "1:1 square";
+      
+      console.log(`Recording in ${formatText} format`);
+      
+      // You could show a toast here if you have a toast library
+      // Toast.show(`Recording in ${formatText} format`);
+      
       camera.current.startRecording({
         fileType: "mp4",
+        videoCodec: "h264",
         onRecordingFinished: async (video: VideoFile) => {
           console.log("Recording finished:", video)
           // Here you can handle the recorded video for post-processing
           const path = video.path
           MediaLibrary.saveToLibraryAsync(path)
+          
+          // Show confirmation of the format that was used
+          Alert.alert(
+            "Recording Saved", 
+            `Your ${selectedMode === "vertical" ? "9:16 vertical" : 
+                   selectedMode === "horizontal" ? "16:9 horizontal" : 
+                   "1:1 square"} video has been saved to your camera roll.`
+          )
         },
         onRecordingError: (error) => {
           console.error("Recording error:", error)
@@ -263,7 +307,7 @@ export default function CameraScreen(): React.ReactElement {
       setIsRecording(false)
       setError(`Failed to start recording: ${errorMessage}`)
     }
-  }, [])
+  }, [selectedMode])
 
   // Stop recording video
   const stopRecording = useCallback(async () => {
@@ -293,13 +337,22 @@ export default function CameraScreen(): React.ReactElement {
     (mode: VideoMode) => {
       setSelectedMode(mode)
       // Force camera update when mode changes
-      setTimeout(() => {
-        if (camera.current) {
-          camera.current.forceUpdate?.()
+      if (camera.current) {
+        // First stop any ongoing recording
+        if (isRecording) {
+          camera.current.stopRecording().catch(console.error)
+          setIsRecording(false)
         }
-      }, 100)
+        
+        // Force camera update
+        setTimeout(() => {
+          if (camera.current) {
+            camera.current.forceUpdate?.()
+          }
+        }, 100)
+      }
     },
-    [camera]
+    [camera, isRecording]
   )
 
   // Calculate dynamic styles for controls based on orientation
@@ -359,6 +412,7 @@ export default function CameraScreen(): React.ReactElement {
         {/* Full Screen Camera Preview */}
         <View style={styles.fullScreenPreviewContainer}>
           <Camera
+            key={cameraKey}
             ref={camera}
             style={[
               styles.fullScreenCamera,
@@ -368,7 +422,7 @@ export default function CameraScreen(): React.ReactElement {
               },
             ]}
             device={device}
-            format={format}
+            format={videoFormat}
             isActive={isActive}
             video={true}
             audio={false}
@@ -406,6 +460,21 @@ export default function CameraScreen(): React.ReactElement {
               <Text style={styles.recordingText}>RECORDING</Text>
             </View>
           )}
+
+          {/* Mode Indicator */}
+          <View
+            style={[
+              styles.modeIndicator,
+              {
+                top: isLandscape ? (isRecording ? 60 : 20) : Math.max(isRecording ? 60 : 20, insets.top + (isRecording ? 40 : 0)),
+                right: isLandscape ? aspectRatio.width - 70 : 20,
+              },
+            ]}
+          >
+            <Text style={styles.modeIndicatorText}>
+              {selectedMode === "vertical" ? "9:16" : selectedMode === "horizontal" ? "16:9" : "1:1"}
+            </Text>
+          </View>
         </View>
 
         {/* Controls - Positioned at bottom with safe area padding */}
@@ -447,7 +516,7 @@ export default function CameraScreen(): React.ReactElement {
     hasPermission,
     renderPermissionRequest,
     aspectRatio,
-    format,
+    videoFormat,
     isActive,
     onCameraError,
     orientationGuidance,
@@ -459,6 +528,7 @@ export default function CameraScreen(): React.ReactElement {
     selectMode,
     toggleRecording,
     error,
+    cameraKey,
   ])
 
   return renderCameraContent()
@@ -602,5 +672,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  modeIndicator: {
+    position: "absolute",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    zIndex: 5,
+  },
+  modeIndicatorText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 12,
   },
 })
