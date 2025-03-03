@@ -1,4 +1,5 @@
 import { useAppState } from "@react-native-community/hooks"
+import * as MediaLibrary from "expo-media-library"
 import { useNavigation } from "expo-router"
 import * as ScreenOrientation from "expo-screen-orientation"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -6,22 +7,14 @@ import { Alert, Dimensions, StatusBar, StyleSheet, Text, TouchableOpacity, View,
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import {
   Camera,
-  CameraDevice,
   CameraRuntimeError,
-  PhotoFile,
   useCameraDevice,
   useCameraFormat,
   useCameraPermission,
   VideoFile,
 } from "react-native-vision-camera"
-import * as MediaLibrary from "expo-media-library"
 
 type VideoMode = "vertical" | "horizontal" | "square"
-
-interface AspectRatio {
-  width: number
-  height: number
-}
 
 interface VideoModeConfig {
   name: string
@@ -54,7 +47,6 @@ export default function CameraScreen(): React.ReactElement {
   const [deviceOrientation, setDeviceOrientation] = useState<ScreenOrientation.Orientation>(
     ScreenOrientation.Orientation.PORTRAIT_UP
   )
-  const [error, setError] = useState<string | null>(null)
   const [cameraKey, setCameraKey] = useState(0)
 
   const navigation = useNavigation()
@@ -95,14 +87,7 @@ export default function CameraScreen(): React.ReactElement {
     )
   }, [deviceOrientation])
 
-  const isPortrait = useMemo(() => {
-    return (
-      deviceOrientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
-      deviceOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN
-    )
-  }, [deviceOrientation])
-
-  const getAspectRatio = useCallback((): AspectRatio => {
+  const aspectRatio = useMemo(() => {
     const screenWidth = Dimensions.get("window").width
     const screenHeight = Dimensions.get("window").height
     const modeConfig = VIDEO_MODES[selectedMode]
@@ -156,13 +141,11 @@ export default function CameraScreen(): React.ReactElement {
     }
   }, [selectedMode, isLandscape])
 
-  const aspectRatio = useMemo(() => getAspectRatio(), [getAspectRatio])
-
   useEffect(() => {
     if (!hasPermission) {
       requestPermission().catch((err) => {
         console.error("Failed to request permission:", err)
-        setError("Failed to request camera permission")
+        Alert.alert("Failed to request camera permission")
       })
     }
   }, [hasPermission, requestPermission])
@@ -188,7 +171,7 @@ export default function CameraScreen(): React.ReactElement {
         setDeviceOrientation(currentOrientation)
       } catch (err) {
         console.error("Failed to setup orientation:", err)
-        setError("Failed to configure device orientation")
+        Alert.alert("Failed to configure device orientation")
       }
     }
 
@@ -203,25 +186,16 @@ export default function CameraScreen(): React.ReactElement {
     }
   }, [])
 
-  const getOrientationGuidance = useCallback((): string => {
+  const orientationGuidance = useMemo(() => {
     switch (selectedMode) {
       case "vertical":
-        if (!isPortrait) {
-          return "Rotate to portrait for optimal vertical video"
-        }
-        break
+        return "Rotate to portrait for optimal vertical video"
       case "horizontal":
-        if (!isLandscape) {
-          return "Rotate to landscape for optimal horizontal video"
-        }
-        break
+        return "Rotate to landscape for optimal horizontal video"
       case "square":
-        return ""
+        return "Hold the phone in portrait mode for optimal square video"
     }
-    return ""
-  }, [selectedMode, isPortrait, isLandscape])
-
-  const orientationGuidance = useMemo(() => getOrientationGuidance(), [getOrientationGuidance])
+  }, [selectedMode])
 
   const onCameraError = useCallback((error: CameraRuntimeError) => {
     console.error(`Camera error: ${error.code}`, error.message)
@@ -262,7 +236,6 @@ export default function CameraScreen(): React.ReactElement {
           console.error("Recording error:", error)
           Alert.alert("Recording Error", "An error occurred while recording video.")
           setIsRecording(false)
-          setError(`Recording error: ${error.message}`)
         },
       })
     } catch (error) {
@@ -270,7 +243,6 @@ export default function CameraScreen(): React.ReactElement {
       console.error("Failed to start recording:", error)
       Alert.alert("Error", "Failed to start recording")
       setIsRecording(false)
-      setError(`Failed to start recording: ${errorMessage}`)
     }
   }, [selectedMode])
 
@@ -283,7 +255,7 @@ export default function CameraScreen(): React.ReactElement {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       console.error("Failed to stop recording:", error)
-      setError(`Failed to stop recording: ${errorMessage}`)
+      Alert.alert(`Failed to stop recording: ${errorMessage}`)
     }
   }, [isRecording])
 
@@ -351,10 +323,9 @@ export default function CameraScreen(): React.ReactElement {
             <Text style={styles.buttonText}>Request Permission</Text>
           </TouchableOpacity>
         )}
-        {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
     )
-  }, [hasPermission, requestPermission, insets.top, insets.bottom, error])
+  }, [hasPermission, requestPermission, insets.top, insets.bottom])
 
   const renderCameraContent = useCallback(() => {
     if (!device || !hasPermission) {
@@ -365,7 +336,6 @@ export default function CameraScreen(): React.ReactElement {
       <View style={styles.container}>
         <StatusBar hidden />
 
-        {/* Full Screen Camera Preview */}
         <View style={styles.fullScreenPreviewContainer}>
           <Camera
             key={cameraKey}
@@ -386,7 +356,6 @@ export default function CameraScreen(): React.ReactElement {
             onError={onCameraError}
           />
 
-          {/* Orientation Guidance */}
           {orientationGuidance ? (
             <View
               style={[
@@ -417,7 +386,6 @@ export default function CameraScreen(): React.ReactElement {
             </View>
           )}
 
-          {/* Mode Indicator */}
           <View
             style={[
               styles.modeIndicator,
@@ -437,9 +405,7 @@ export default function CameraScreen(): React.ReactElement {
           </View>
         </View>
 
-        {/* Controls - Positioned at bottom with safe area padding */}
         <View style={[styles.controls, controlsStyle]}>
-          {/* Mode Selection */}
           <View style={[styles.modeSelection, isLandscape ? { marginBottom: 20 } : {}]}>
             {Object.entries(VIDEO_MODES).map(([mode, config]) => (
               <TouchableOpacity
@@ -452,7 +418,6 @@ export default function CameraScreen(): React.ReactElement {
             ))}
           </View>
 
-          {/* Record Button */}
           <TouchableOpacity
             style={[styles.recordButton, isRecording && styles.recordingButton]}
             onPress={toggleRecording}
@@ -460,15 +425,6 @@ export default function CameraScreen(): React.ReactElement {
             <Text style={styles.recordButtonText}>{isRecording ? "STOP" : "REC"}</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Error message if any */}
-        {error && (
-          <View style={styles.errorOverlay}>
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          </View>
-        )}
       </View>
     )
   }, [
@@ -487,7 +443,6 @@ export default function CameraScreen(): React.ReactElement {
     selectedMode,
     selectMode,
     toggleRecording,
-    error,
     cameraKey,
   ])
 
