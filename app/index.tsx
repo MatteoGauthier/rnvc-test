@@ -2,16 +2,7 @@ import { useAppState } from "@react-native-community/hooks"
 import { useNavigation } from "expo-router"
 import * as ScreenOrientation from "expo-screen-orientation"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-  Alert,
-  Dimensions,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from "react-native"
+import { Alert, Dimensions, StatusBar, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import {
   Camera,
@@ -23,6 +14,7 @@ import {
   useCameraPermission,
   VideoFile,
 } from "react-native-vision-camera"
+import * as MediaLibrary from "expo-media-library"
 
 // Define video modes with their aspect ratios for better type safety
 type VideoMode = "vertical" | "horizontal" | "square"
@@ -78,10 +70,7 @@ export default function CameraScreen(): React.ReactElement {
   const device = useCameraDevice("back")
 
   // Configure camera format for Full HD (1920x1080) at 30fps
-  const format = useCameraFormat(device, [
-    { videoResolution: { width: 1920, height: 1080 } },
-    { fps: 30 },
-  ])
+  const format = useCameraFormat(device, [{ videoResolution: { width: 1920, height: 1080 } }, { fps: 30 }])
 
   // Check if orientation is landscape
   const isLandscape = useMemo(() => {
@@ -115,21 +104,21 @@ export default function CameraScreen(): React.ReactElement {
       } else if (selectedMode === "horizontal") {
         // In landscape, maintain 16:9 ratio
         // Calculate both options and use the one that fits better
-        const widthConstrainedHeight = screenWidth / modeConfig.landscapeRatio;
-        const heightConstrainedWidth = screenHeight * modeConfig.landscapeRatio;
-        
+        const widthConstrainedHeight = screenWidth / modeConfig.landscapeRatio
+        const heightConstrainedWidth = screenHeight * modeConfig.landscapeRatio
+
         // If using width as constraint would exceed screen height, use height as constraint
         if (widthConstrainedHeight > screenHeight) {
           return {
             width: heightConstrainedWidth,
             height: screenHeight,
-          };
+          }
         } else {
           // Otherwise use width as constraint
           return {
             width: screenWidth,
             height: widthConstrainedHeight,
-          };
+          }
         }
       } else {
         // Square: use height as the constraint
@@ -188,7 +177,7 @@ export default function CameraScreen(): React.ReactElement {
         subscription = ScreenOrientation.addOrientationChangeListener(({ orientationInfo }) => {
           console.log("Orientation changed:", orientationInfo.orientation)
           setDeviceOrientation(orientationInfo.orientation)
-          
+
           // Force re-render of camera
           if (camera.current) {
             camera.current.forceUpdate?.()
@@ -254,9 +243,11 @@ export default function CameraScreen(): React.ReactElement {
     try {
       camera.current.startRecording({
         fileType: "mp4",
-        onRecordingFinished: (video: VideoFile) => {
+        onRecordingFinished: async (video: VideoFile) => {
           console.log("Recording finished:", video)
           // Here you can handle the recorded video for post-processing
+          const path = video.path
+          MediaLibrary.saveToLibraryAsync(path)
         },
         onRecordingError: (error) => {
           console.error("Recording error:", error)
@@ -380,7 +371,7 @@ export default function CameraScreen(): React.ReactElement {
             format={format}
             isActive={isActive}
             video={true}
-            audio={true}
+            audio={false}
             enableZoomGesture
             onError={onCameraError}
           />
