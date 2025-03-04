@@ -287,7 +287,7 @@ export default function CameraScreen(): React.ReactElement {
     [camera, isRecording]
   )
 
-  const getControlsStyle = useCallback((): ViewStyle => {
+  const controlsStyle = useMemo<ViewStyle>(() => {
     if (isLandscape) {
       return {
         position: "absolute",
@@ -307,8 +307,6 @@ export default function CameraScreen(): React.ReactElement {
       }
     }
   }, [isLandscape, insets.right, insets.bottom])
-
-  const controlsStyle = useMemo(() => getControlsStyle(), [getControlsStyle])
 
   const renderPermissionRequest = useCallback(() => {
     return (
