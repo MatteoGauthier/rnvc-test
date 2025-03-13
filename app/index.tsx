@@ -325,126 +325,119 @@ export default function CameraScreen(): React.ReactElement {
     )
   }, [hasPermission, requestPermission, insets.top, insets.bottom])
 
-  const renderCameraContent = useCallback(() => {
-    if (!device || !hasPermission) {
-      return renderPermissionRequest()
-    }
+  const [flashMode, setFlashMode] = useState<"on" | "off">("off")
+  console.log("🚀 ~ flashMode:", flashMode)
 
-    return (
-      <View style={styles.container}>
-        <StatusBar hidden />
+  if (!device || !hasPermission) {
+    return renderPermissionRequest()
+  }
 
-        <View style={styles.fullScreenPreviewContainer}>
-          <Camera
-            key={cameraKey}
-            ref={camera}
-            style={[
-              styles.fullScreenCamera,
-              {
-                width: aspectRatio.width,
-                height: aspectRatio.height,
-              },
-            ]}
-            device={device}
-            format={videoFormat}
-            isActive={isActive}
-            video={true}
-            audio={false}
-            enableZoomGesture
-            onError={onCameraError}
-          />
+  return (
+    <View style={styles.container}>
+      <StatusBar hidden />
 
-          {orientationGuidance ? (
-            <View
-              style={[
-                styles.orientationGuidance,
-                {
-                  top: isLandscape ? 20 : Math.max(20, insets.top),
-                  left: isLandscape ? Math.max(20, insets.left) : 0,
-                  right: isLandscape ? Math.max(20, insets.right) : 0,
-                },
-              ]}
-            >
-              <Text style={styles.orientationText}>{orientationGuidance}</Text>
-            </View>
-          ) : null}
+      <View style={styles.fullScreenPreviewContainer}>
+        <Camera
+          key={cameraKey}
+          ref={camera}
+          style={[
+            styles.fullScreenCamera,
+            {
+              width: aspectRatio.width,
+              height: aspectRatio.height,
+            },
+          ]}
+          device={device}
+          format={videoFormat}
+          isActive={isActive}
+          video={true}
+          audio={false}
+          enableZoomGesture
+          torch={flashMode}
+          onError={onCameraError}
+        />
 
-          {/* Recording Indicator */}
-          {isRecording && (
-            <View
-              style={[
-                styles.recordingIndicator,
-                {
-                  top: isLandscape ? 20 : Math.max(20, insets.top),
-                  right: isLandscape ? aspectRatio.width - 70 : 20,
-                },
-              ]}
-            >
-              <Text style={styles.recordingText}>RECORDING</Text>
-            </View>
-          )}
-
+        {orientationGuidance ? (
           <View
             style={[
-              styles.modeIndicator,
+              styles.orientationGuidance,
               {
-                top: isLandscape
-                  ? isRecording
-                    ? 60
-                    : 20
-                  : Math.max(isRecording ? 60 : 20, insets.top + (isRecording ? 40 : 0)),
+                top: isLandscape ? 20 : Math.max(20, insets.top),
+                left: isLandscape ? Math.max(20, insets.left) : 0,
+                right: isLandscape ? Math.max(20, insets.right) : 0,
+              },
+            ]}
+          >
+            <Text style={styles.orientationText}>{orientationGuidance}</Text>
+          </View>
+        ) : null}
+
+        {/* Recording Indicator */}
+        {isRecording && (
+          <View
+            style={[
+              styles.recordingIndicator,
+              {
+                top: isLandscape ? 20 : Math.max(20, insets.top),
                 right: isLandscape ? aspectRatio.width - 70 : 20,
               },
             ]}
           >
-            <Text style={styles.modeIndicatorText}>
-              {selectedMode === "vertical" ? "9:16" : selectedMode === "horizontal" ? "16:9" : "1:1"}
-            </Text>
+            <Text style={styles.recordingText}>RECORDING</Text>
           </View>
-        </View>
+        )}
 
-        <View style={[styles.controls, controlsStyle]}>
-          <View style={[styles.modeSelection, isLandscape ? { marginBottom: 20 } : {}]}>
-            {Object.entries(VIDEO_MODES).map(([mode, config]) => (
-              <TouchableOpacity
-                key={mode}
-                style={[styles.modeButton, selectedMode === mode && styles.selectedMode]}
-                onPress={() => selectMode(mode as VideoMode)}
-              >
-                <Text style={styles.modeText}>{config.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <TouchableOpacity
-            style={[styles.recordButton, isRecording && styles.recordingButton]}
-            onPress={toggleRecording}
-          >
-            <Text style={styles.recordButtonText}>{isRecording ? "STOP" : "REC"}</Text>
-          </TouchableOpacity>
+        <View
+          style={[
+            styles.modeIndicator,
+            {
+              top: isLandscape
+                ? isRecording
+                  ? 60
+                  : 20
+                : Math.max(isRecording ? 60 : 20, insets.top + (isRecording ? 40 : 0)),
+              right: isLandscape ? aspectRatio.width - 70 : 20,
+            },
+          ]}
+        >
+          <Text style={styles.modeIndicatorText}>
+            {selectedMode === "vertical" ? "9:16" : selectedMode === "horizontal" ? "16:9" : "1:1"}
+          </Text>
         </View>
       </View>
-    )
-  }, [
-    device,
-    hasPermission,
-    renderPermissionRequest,
-    aspectRatio,
-    videoFormat,
-    isActive,
-    onCameraError,
-    orientationGuidance,
-    isLandscape,
-    insets,
-    isRecording,
-    controlsStyle,
-    selectedMode,
-    selectMode,
-    toggleRecording,
-    cameraKey,
-  ])
 
-  return renderCameraContent()
+      <View style={[styles.controls, controlsStyle]}>
+        <TouchableOpacity
+          style={{
+            backgroundColor: "red",
+            width: 100,
+            height: 100,
+          }}
+          onPress={() => setFlashMode(flashMode === "on" ? "off" : "on")}
+        >
+          <Text style={{ color: "white" }}>Flash {flashMode}</Text>
+        </TouchableOpacity>
+        <View style={[styles.modeSelection, isLandscape ? { marginBottom: 20 } : {}]}>
+          {Object.entries(VIDEO_MODES).map(([mode, config]) => (
+            <TouchableOpacity
+              key={mode}
+              style={[styles.modeButton, selectedMode === mode && styles.selectedMode]}
+              onPress={() => selectMode(mode as VideoMode)}
+            >
+              <Text style={styles.modeText}>{config.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.recordButton, isRecording && styles.recordingButton]}
+          onPress={toggleRecording}
+        >
+          <Text style={styles.recordButtonText}>{isRecording ? "STOP" : "REC"}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
